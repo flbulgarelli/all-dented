@@ -212,6 +212,10 @@ class PrettyPrinter {
     this.push(this.current);
   }
 
+  pushWhitespace() {
+    this.push(Lexer.WHITESPACE);
+  }
+
   last() {
     return this.resultingTokens[this.resultingTokens.length - 1]
   }
@@ -280,7 +284,7 @@ class PrettyPrinter {
             this.advanceIgnoringWhitespacesAndNewlines();
 
             // whitespace
-            this.push(Lexer.WHITESPACE);
+            this.pushWhitespace();
 
             // name
             if (this.current.type == 'IDENTIFIER') {
@@ -297,16 +301,12 @@ class PrettyPrinter {
             while (balance > 0 && this.notEnd()) {
               if (this.current == Lexer.OPEN_PAREN) {
                 balance++;
-                this.pushCurrent();
-                this.advance();
               } else if (this.current == Lexer.CLOSE_PAREN) {
                 balance--;
-                if (balance == 0) {
-                  this.popWhitespaceOrNewline();
-                } else {
-                  this.pushCurrent();
-                  this.advance();
-                }
+              }
+
+              if (balance == 0) {
+                this.popWhitespaceOrNewline();
               } else {
                 this.pushCurrent();
                 this.advance();
@@ -318,9 +318,34 @@ class PrettyPrinter {
             this.advanceIgnoringWhitespacesAndNewlines();
 
             // whitespace
-            this.push(Lexer.WHITESPACE);
+            this.pushWhitespace();
 
             // {
+            this.pushCurrent();
+            this.pushNewlineWhenNextIsMissing();
+            this.advance();
+
+            console.log(this.current)
+
+            // body
+            balance = 1;
+            while (balance > 0 && this.notEnd()) {
+              if (this.current == Lexer.OPEN_BRACE) {
+                balance++;
+              } else if (this.current == Lexer.CLOSE_BRACE) {
+                balance--;
+              }
+
+              if (balance == 0) {
+                this.popWhitespaceOrNewline();
+              } else {
+                this.pushCurrent();
+                this.advance();
+              }
+            }
+
+            // }
+            this.push(Lexer.NEWLINE);
             this.pushCurrent();
             this.pushNewlineWhenNextIsMissing();
             break;
@@ -429,8 +454,9 @@ describe("format", () => {
       assert.equal(format("function foo() {\n}function bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
     });
 
-
     it("function(x) {\n}\n", () => { assert.equal(format("function(x) {\n}\n"), "function (x) {\n}\n") });
+    it("function(x){return 2;}", () => { assert.equal(format("function(x){return 2;}"), "function (x) {\nreturn 2;\n}\n") });
+    it("function(x){return 2}", () => { assert.equal(format("function(x){return 2}"), "function (x) {\nreturn 2\n}\n") });
 
     it("function foo(x) {\n}\n", () => { assert.equal(format("function foo(x) {\n}\n"), "function foo(x) {\n}\n") });
     it(" function foo(x) {\n}\n", () => { assert.equal(format(" function foo(x) {\n}\n"), " \nfunction foo(x) {\n}\n") });
