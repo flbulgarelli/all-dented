@@ -263,96 +263,98 @@ class PrettyPrinter {
     }
   }
 
-  prettyPrint() {
-    while (this.notEnd()) {
-      this.advance();
-      switch (this.current.type) {
-        case Lexer.NEWLINE.type:
-        case Lexer.WHITESPACE.type:
+  handleCurrent() {
+    switch (this.current.type) {
+      case Lexer.NEWLINE.type:
+      case Lexer.WHITESPACE.type:
+        this.pushCurrent();
+        this.consumeWhitespacesAndNewlines();
+        break;
+      case Lexer.SEMI.type:
+        this.pushCurrent();
+        this.pushNewlineWhenNextIsMissing();
+        break;
+      case 'IDENTIFIER':
+        if (this.atDeclaration()) {
+          // keyword
+          this.pushNewlineWhenPreviousIsMissing();
           this.pushCurrent();
-          this.consumeWhitespacesAndNewlines();
-          break;
-        case Lexer.SEMI.type:
+          this.advanceIgnoringWhitespacesAndNewlines();
+
+          // whitespace
+          this.pushWhitespace();
+
+          // name
+          if (this.current.type == 'IDENTIFIER') {
+            this.pushCurrent();
+            this.advanceIgnoringWhitespacesAndNewlines();
+          }
+
+          // (
+          this.pushCurrent();
+          this.advanceIgnoringWhitespacesAndNewlines();
+
+          // args
+          let balance = 1;
+          while (balance > 0 && this.notEnd()) {
+            if (this.current == Lexer.OPEN_PAREN) {
+              balance++;
+            } else if (this.current == Lexer.CLOSE_PAREN) {
+              balance--;
+            }
+
+            if (balance == 0) {
+              this.popWhitespaceOrNewline();
+            } else {
+              this.pushCurrent();
+              this.advance();
+            }
+          }
+
+          // )
+          this.pushCurrent();
+          this.advanceIgnoringWhitespacesAndNewlines();
+
+          // whitespace
+          this.pushWhitespace();
+
+          // {
+          this.pushCurrent();
+          this.pushNewlineWhenNextIsMissing();
+          this.advance();
+
+          // body
+          balance = 1;
+          while (balance > 0 && this.notEnd()) {
+            if (this.current == Lexer.OPEN_BRACE) {
+              balance++;
+            } else if (this.current == Lexer.CLOSE_BRACE) {
+              balance--;
+            }
+
+            if (balance == 0) {
+              this.popWhitespaceOrNewline();
+            } else {
+              this.handleCurrent();
+              this.advance();
+            }
+          }
+
+          // }
+          this.pushNewlineWhenPreviousIsMissing();
           this.pushCurrent();
           this.pushNewlineWhenNextIsMissing();
           break;
-        case 'IDENTIFIER':
-          if (this.atDeclaration()) {
-            // keyword
-            this.pushNewlineWhenPreviousIsMissing();
-            this.pushCurrent();
-            this.advanceIgnoringWhitespacesAndNewlines();
+        }
+      default:
+        this.pushCurrent();
+    }
+  }
 
-            // whitespace
-            this.pushWhitespace();
-
-            // name
-            if (this.current.type == 'IDENTIFIER') {
-              this.pushCurrent();
-              this.advanceIgnoringWhitespacesAndNewlines();
-            }
-
-            // (
-            this.pushCurrent();
-            this.advanceIgnoringWhitespacesAndNewlines();
-
-            // args
-            let balance = 1;
-            while (balance > 0 && this.notEnd()) {
-              if (this.current == Lexer.OPEN_PAREN) {
-                balance++;
-              } else if (this.current == Lexer.CLOSE_PAREN) {
-                balance--;
-              }
-
-              if (balance == 0) {
-                this.popWhitespaceOrNewline();
-              } else {
-                this.pushCurrent();
-                this.advance();
-              }
-            }
-
-            // )
-            this.pushCurrent();
-            this.advanceIgnoringWhitespacesAndNewlines();
-
-            // whitespace
-            this.pushWhitespace();
-
-            // {
-            this.pushCurrent();
-            this.pushNewlineWhenNextIsMissing();
-            this.advance();
-
-            console.log(this.current)
-
-            // body
-            balance = 1;
-            while (balance > 0 && this.notEnd()) {
-              if (this.current == Lexer.OPEN_BRACE) {
-                balance++;
-              } else if (this.current == Lexer.CLOSE_BRACE) {
-                balance--;
-              }
-
-              if (balance == 0) {
-                this.popWhitespaceOrNewline();
-              } else {
-                this.pushCurrent();
-                this.advance();
-              }
-            }
-
-            // }
-            this.push(Lexer.NEWLINE);
-            this.pushCurrent();
-            this.pushNewlineWhenNextIsMissing();
-            break;
-          }
-        default:
-          this.pushCurrent();
-      }
+  prettyPrint() {
+    while (this.notEnd()) {
+      this.advance();
+      this.handleCurrent();
     }
     return this.resultingTokens.map((token) => token.value).join('');
   }
@@ -434,59 +436,59 @@ function format(code) {
 }
 
 describe("format", () => {
+  function prints(code, pretty) {
+    it(code, () => { assert.deepEqual(format(code), pretty) });
+  }
 
-  it("foo();bar();baz()", () => { assert.equal(format("foo();bar();baz()"), "foo();\nbar();\nbaz()") });
-  it("", () => { assert.equal(format(""), "") });
-  it("let x = 1;\n", () => { assert.equal(format("let x = 1;\n"), "let x = 1;\n") });
-  it("x\n", () => { assert.equal(format("x\n"), "x\n") });
+
+  prints(("foo();bar();baz()"), "foo();\nbar();\nbaz()");
+  prints((""), "");
+  prints(("let x = 1;\n"), "let x = 1;\n");
+  prints(("x\n"), "x\n");
 
   describe("ifs", () => {
-    it("if (true) {\nconsole.log('ups')\n}\n", () => { assert.equal(format("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n") });
-    it("if(true){\nconsole.log('ups')\n}\n", () => { assert.equal(format("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n") });
+    prints(("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n");
+    prints(("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n");
   });
 
   describe("functions", () => {
-    it("function foo() {\n}\n", () => { assert.equal(format("function foo() {\n}\n"), "function foo() {\n}\n") });
-    it("function foo() {\n}\n\nfunction bar() {\n}\n", () => {
-      assert.equal(format("function foo() {\n}\n\nfunction bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
-    });
-    it("function foo() {\n}function bar() {\n}\n", () => {
-      assert.equal(format("function foo() {\n}function bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
-    });
+    prints("function foo() {\n}\n", "function foo() {\n}\n");
+    prints("function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n");
+    prints("function foo() {\n}function bar() {\n}\n", "function foo() {\n}function bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n");
 
-    it("function(x) {\n}\n", () => { assert.equal(format("function(x) {\n}\n"), "function (x) {\n}\n") });
-    it("function(x){return 2;}", () => { assert.equal(format("function(x){return 2;}"), "function (x) {\nreturn 2;\n}\n") });
-    it("function(x){return 2}", () => { assert.equal(format("function(x){return 2}"), "function (x) {\nreturn 2\n}\n") });
+    prints("function(x) {\n}\n", "function (x) {\n}\n");
+    prints("function(x){return 2;}", "function (x) {\nreturn 2;\n}\n");
+    prints("function(x){return 2}", "function (x) {\nreturn 2\n}\n");
 
-    it("function foo(x) {\n}\n", () => { assert.equal(format("function foo(x) {\n}\n"), "function foo(x) {\n}\n") });
-    it(" function foo(x) {\n}\n", () => { assert.equal(format(" function foo(x) {\n}\n"), " \nfunction foo(x) {\n}\n") });
-    it("\n\nfunction foo(x) {\n}\n", () => { assert.equal(format("\n\nfunction foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
-    it("\n\n  function foo(x) {\n}\n", () => { assert.equal(format("\n\n  function foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
-    it("\n \n  function foo(x) {\n}\n", () => { assert.equal(format("\n \n  function foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
-    it(" \n \n  function foo(x) {\n}\n", () => { assert.equal(format(" \n \n  function foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
+    prints("function foo(x) {\n}\n", "function foo(x) {\n}\n");
+    prints(" function foo(x) {\n}\n", " \nfunction foo(x) {\n}\n");
+    prints("\n\nfunction foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
+    prints("\n\n  function foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
+    prints("\n \n  function foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
+    prints(" \n \n  function foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
 
-    it("function foo (x) {\n}\n", () => { assert.equal(format("function foo (x) {\n}\n"), "function foo(x) {\n}\n") });
-    it("function foo (x, y) {\n}\n", () => { assert.equal(format("function foo (x, y) {\n}\n"), "function foo(x, y) {\n}\n") });
-    it("function foo (  x, y ) {\n}\n", () => { assert.equal(format("function foo (  x, y ) {\n}\n"), "function foo(x, y) {\n}\n") });
-    it("function foo (x, y) {}\n", () => { assert.equal(format("function foo (x, y) {}\n"), "function foo(x, y) {\n}\n") });
-    it("function (x, y) {}\n", () => { assert.equal(format("function (x, y) {}\n"), "function (x, y) {\n}\n") });
+    prints("function foo (x) {\n}\n", "function foo(x) {\n}\n");
+    prints("function foo (x, y) {\n}\n", "function foo(x, y) {\n}\n");
+    prints("function foo (  x, y ) {\n}\n", "function foo(x, y) {\n}\n");
+    prints("function foo (x, y) {}\n", "function foo(x, y) {\n}\n");
+    prints("function (x, y) {}\n", "function (x, y) {\n}\n");
   });
 
   describe("procedures", () => {
-    it("procedure Foo(x) {\n}\n", () => { assert.equal(format("procedure Foo(x) {\n}\n"), "procedure Foo(x) {\n}\n") });
-    it("procedure Foo (x) {\n}\n", () => { assert.equal(format("procedure Foo (x) {\n}\n"), "procedure Foo(x) {\n}\n") });
-    it("procedure Foo (x, y) {\n}\n", () => { assert.equal(format("procedure Foo (x, y) {\n}\n"), "procedure Foo(x, y) {\n}\n") });
-    it("procedure Foo (  x, y ) {\n}\n", () => { assert.equal(format("procedure Foo (  x, y ) {\n}\n"), "procedure Foo(x, y) {\n}\n") });
-    it("procedure Foo (x, y) {}\n", () => { assert.equal(format("procedure Foo (x, y) {}\n"), "procedure Foo(x, y) {\n}\n") });
+    prints("procedure Foo(x) {\n}\n", "procedure Foo(x) {\n}\n");
+    prints("procedure Foo (x) {\n}\n", "procedure Foo(x) {\n}\n");
+    prints("procedure Foo (x, y) {\n}\n", "procedure Foo(x, y) {\n}\n");
+    prints("procedure Foo (  x, y ) {\n}\n", "procedure Foo(x, y) {\n}\n");
+    prints("procedure Foo (x, y) {}\n", "procedure Foo(x, y) {\n}\n");
   });
 
   xdescribe("defs", () => {
-    it("def foo(x)\nend", () => { assert.equal(format("def foo(x)\nend"), "def foo(x)\nend") });
-    it("def foo (x)\nend", () => { assert.equal(format("def foo (x)\nend"), "def foo(x)\nend") });
-    it("def foo (x, y)\nend", () => { assert.equal(format("def foo (x, y)\nend"), "def foo(x, y)\nend") });
-    it("def foo (  x, y )\nend", () => { assert.equal(format("def foo (  x, y )\nend"), "def foo(x, y)\nend") });
-    it("def foo (  x, y )end", () => { assert.equal(format("def foo (  x, y )end"), "def foo(x, y)\nend") });
-    it("def foo! (  x, y )end", () => { assert.equal(format("def foo! (  x, y )end"), "def foo!(x, y)\nend") });
-    it("def foo? (  x, y )end", () => { assert.equal(format("def foo? (  x, y )end"), "def foo?(x, y)\nend") });
+    prints("def foo(x)\nend", "def foo(x)\nend");
+    prints("def foo (x)\nend", "def foo(x)\nend");
+    prints("def foo (x, y)\nend", "def foo(x, y)\nend");
+    prints("def foo (  x, y )\nend", "def foo(x, y)\nend");
+    prints("def foo (  x, y )end", "def foo(x, y)\nend");
+    prints("def foo! (  x, y )end", "def foo!(x, y)\nend");
+    prints("def foo? (  x, y )end", "def foo?(x, y)\nend");
   });
 });
