@@ -452,6 +452,8 @@ describe("format", () => {
   });
 
   describe("functions", () => {
+    prints("function foo(){let x = 1; let y = 2; if(true){console.log(y)}}", "function foo() {\nlet x = 1;\n let y = 2;\n \nif (true) {\nconsole.log(y)\n}\n}\n");
+
     prints("function foo() {\n}\n", "function foo() {\n}\n");
     prints("function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n");
     prints("function foo() {\n}function bar() {\n}\n", "function foo() {\n}function bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n");
