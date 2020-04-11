@@ -216,6 +216,11 @@ class PrettyPrinter {
     return this.resultingTokens[this.resultingTokens.length - 1]
   }
 
+  pop() {
+    this.resultingTokens.pop();
+  }
+
+
   // =========================
   // Pretty Printing Primitives
   // ==========================
@@ -233,6 +238,13 @@ class PrettyPrinter {
     }
   }
 
+  popWhitespaceOrNewline() {
+    let lastToken = this.last();
+    if (lastToken && Lexer.whitespaceOrNewline(lastToken)) {
+      this.pop();
+    }
+  }
+
   consumeWhitespacesAndNewlines() {
     while (this.notEnd() && Lexer.whitespaceOrNewline(this.lookAhead())) {
       this.advance();
@@ -247,7 +259,7 @@ class PrettyPrinter {
     }
   }
 
-  prettyPrint(controlStructures) {
+  prettyPrint() {
     while (this.notEnd()) {
       this.advance();
       switch (this.current.type) {
@@ -266,6 +278,8 @@ class PrettyPrinter {
             this.pushNewlineWhenPreviousIsMissing();
             this.pushCurrent();
             this.advanceIgnoringWhitespacesAndNewlines();
+
+            // whitespace
             this.push(Lexer.WHITESPACE);
 
             // name
@@ -278,17 +292,37 @@ class PrettyPrinter {
             this.pushCurrent();
             this.advanceIgnoringWhitespacesAndNewlines();
 
-            this.pushCurrent();
+            // args
             let balance = 1;
             while (balance > 0 && this.notEnd()) {
               if (this.current == Lexer.OPEN_PAREN) {
                 balance++;
-              } else if (this.lookAhead() == Lexer.CLOSE_PAREN) {
+                this.pushCurrent();
+                this.advance();
+              } else if (this.current == Lexer.CLOSE_PAREN) {
                 balance--;
+                if (balance == 0) {
+                  this.popWhitespaceOrNewline();
+                } else {
+                  this.pushCurrent();
+                  this.advance();
+                }
+              } else {
+                this.pushCurrent();
+                this.advance();
               }
-              this.advance();
-              this.pushCurrent();
             }
+
+            // )
+            this.pushCurrent();
+            this.advanceIgnoringWhitespacesAndNewlines();
+
+            // whitespace
+            this.push(Lexer.WHITESPACE);
+
+            // {
+            this.pushCurrent();
+            this.pushNewlineWhenNextIsMissing();
             break;
           }
         default:
@@ -371,7 +405,7 @@ describe("Lexer", () => {
 
 
 function format(code) {
-  return new PrettyPrinter(code, ['function', 'procedure']).prettyPrint(['if', 'repeat', 'while']);
+  return new PrettyPrinter(code, ['function', 'procedure', 'if', 'repeat']).prettyPrint();
 }
 
 describe("format", () => {
@@ -383,7 +417,7 @@ describe("format", () => {
 
   describe("ifs", () => {
     it("if (true) {\nconsole.log('ups')\n}\n", () => { assert.equal(format("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n") });
-    it("if(true){\nconsole.log('ups')\n}\n", () => { assert.equal(format("if(true){\nconsole.log('ups')\n}\n"), "if(true) {\nconsole.log('ups')\n}\n") });
+    it("if(true){\nconsole.log('ups')\n}\n", () => { assert.equal(format("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n") });
   });
 
   describe("functions", () => {
@@ -391,6 +425,10 @@ describe("format", () => {
     it("function foo() {\n}\n\nfunction bar() {\n}\n", () => {
       assert.equal(format("function foo() {\n}\n\nfunction bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
     });
+    it("function foo() {\n}function bar() {\n}\n", () => {
+      assert.equal(format("function foo() {\n}function bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
+    });
+
 
     it("function(x) {\n}\n", () => { assert.equal(format("function(x) {\n}\n"), "function (x) {\n}\n") });
 
@@ -405,7 +443,7 @@ describe("format", () => {
     it("function foo (x, y) {\n}\n", () => { assert.equal(format("function foo (x, y) {\n}\n"), "function foo(x, y) {\n}\n") });
     it("function foo (  x, y ) {\n}\n", () => { assert.equal(format("function foo (  x, y ) {\n}\n"), "function foo(x, y) {\n}\n") });
     it("function foo (x, y) {}\n", () => { assert.equal(format("function foo (x, y) {}\n"), "function foo(x, y) {\n}\n") });
-    it("function (x, y) {}\n", () => { assert.equal(format("function (x, y) {}\n"), "function (x, y) {}\n") });
+    it("function (x, y) {}\n", () => { assert.equal(format("function (x, y) {}\n"), "function (x, y) {\n}\n") });
   });
 
   describe("procedures", () => {
