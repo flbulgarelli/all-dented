@@ -263,6 +263,10 @@ class PrettyPrinter {
     }
   }
 
+  // ========
+  // Handlers
+  // ========
+
   handleCurrent() {
     switch (this.current.type) {
       case Lexer.NEWLINE.type:
@@ -276,79 +280,72 @@ class PrettyPrinter {
         break;
       case 'IDENTIFIER':
         if (this.atDeclaration()) {
-          // keyword
-          this.pushNewlineWhenPreviousIsMissing();
-          this.pushCurrent();
-          this.advanceIgnoringWhitespacesAndNewlines();
-
-          // whitespace
-          this.pushWhitespace();
-
-          // name
-          if (this.current.type == 'IDENTIFIER') {
-            this.pushCurrent();
-            this.advanceIgnoringWhitespacesAndNewlines();
-          }
-
-          // (
-          this.pushCurrent();
-          this.advanceIgnoringWhitespacesAndNewlines();
-
-          // args
-          let balance = 1;
-          while (balance > 0 && this.notEnd()) {
-            if (this.current == Lexer.OPEN_PAREN) {
-              balance++;
-            } else if (this.current == Lexer.CLOSE_PAREN) {
-              balance--;
-            }
-
-            if (balance == 0) {
-              this.popWhitespaceOrNewline();
-            } else {
-              this.pushCurrent();
-              this.advance();
-            }
-          }
-
-          // )
-          this.pushCurrent();
-          this.advanceIgnoringWhitespacesAndNewlines();
-
-          // whitespace
-          this.pushWhitespace();
-
-          // {
-          this.pushCurrent();
-          this.pushNewlineWhenNextIsMissing();
-          this.advance();
-
-          // body
-          balance = 1;
-          while (balance > 0 && this.notEnd()) {
-            if (this.current == Lexer.OPEN_BRACE) {
-              balance++;
-            } else if (this.current == Lexer.CLOSE_BRACE) {
-              balance--;
-            }
-
-            if (balance == 0) {
-              this.popWhitespaceOrNewline();
-            } else {
-              this.handleCurrent();
-              this.advance();
-            }
-          }
-
-          // }
-          this.pushNewlineWhenPreviousIsMissing();
-          this.pushCurrent();
-          this.pushNewlineWhenNextIsMissing();
+          this.handleDeclaration();
           break;
         }
       default:
         this.pushCurrent();
     }
+  }
+
+  handleBalanced(openToken, closeToken, cont) {
+    let balance = 1;
+    while (balance > 0 && this.notEnd()) {
+      if (this.current == openToken) {
+        balance++;
+      } else if (this.current == closeToken) {
+        balance--;
+      }
+
+      if (balance == 0) {
+        this.popWhitespaceOrNewline();
+      } else {
+        cont();
+        this.advance();
+      }
+    }
+  }
+
+  handleDeclaration() {
+    this.pushNewlineWhenPreviousIsMissing();
+    this.pushCurrent();
+    this.advanceIgnoringWhitespacesAndNewlines();
+
+    // whitespace
+    this.pushWhitespace();
+
+    // name
+    if (this.current.type == 'IDENTIFIER') {
+      this.pushCurrent();
+      this.advanceIgnoringWhitespacesAndNewlines();
+    }
+
+    // (
+    this.pushCurrent();
+    this.advanceIgnoringWhitespacesAndNewlines();
+
+    // args
+    this.handleBalanced(Lexer.OPEN_PAREN, Lexer.CLOSE_PAREN, () => this.pushCurrent());
+
+    // )
+    this.pushCurrent();
+    this.advanceIgnoringWhitespacesAndNewlines();
+
+    // whitespace
+    this.pushWhitespace();
+
+    // {
+    this.pushCurrent();
+    this.pushNewlineWhenNextIsMissing();
+    this.advance();
+
+    // body
+    this.handleBalanced(Lexer.OPEN_BRACE, Lexer.CLOSE_BRACE, () => this.handleCurrent());
+
+    // }
+    this.pushNewlineWhenPreviousIsMissing();
+    this.pushCurrent();
+    this.pushNewlineWhenNextIsMissing();
   }
 
   prettyPrint() {
