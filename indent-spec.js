@@ -144,6 +144,8 @@ Lexer.identifier = Lexer.singleValueToken('IDENTIFIER')
 Lexer.comment = Lexer.singleValueToken('COMMENT')
 Lexer.other = Lexer.singleValueToken('OTHER')
 
+Lexer.whitespaceOrNewline = (token) => token == Lexer.WHITESPACE || token == Lexer.NEWLINE;
+
 function isAlpha(x) {
   return x.match(/[a-zA-Z_]/);
 }
@@ -160,12 +162,17 @@ function printCode(code) {
 }
 
 class PrettyPrinter {
-  constructor(code) {
+  constructor(code, declarations) {
     this.code = code;
     this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {compactWhitespaces: true});
     this.index = 0;
     this.resultingTokens = [];
+    this.declarations = declarations;
   }
+
+  // =========
+  // Traversal
+  // =========
 
   notEnd() {
     return this.index < this.tokens.length;
@@ -177,16 +184,25 @@ class PrettyPrinter {
     return this.current;
   }
 
-  // TODO: check if actually required
-  consumeWhitespaces() {
-    while (this.notEnd() && this.lookAhead() == Lexer.WHITESPACE) {
-      this.advance();
-    }
-  }
-
   lookAhead() {
     return this.tokens[this.index];
   }
+
+  // ==============
+  // Input checking
+  // ==============
+
+  atWhitespaceOrNewline() {
+    return Lexer.whitespaceOrNewline(this.current);
+  }
+
+  atDeclaration() {
+    return this.declarations.indexOf(this.current.value) > -1;
+  }
+
+  // ===============
+  // Output handling
+  // ===============
 
   push(token) {
     this.resultingTokens.push(token);
@@ -196,30 +212,44 @@ class PrettyPrinter {
     this.push(this.current);
   }
 
-  atWhitespaceOrNewline() {
-    return this.current == Lexer.WHITESPACE || this.current == Lexer.NEWLINE;
+  last() {
+    return this.resultingTokens[this.resultingTokens.length - 1]
   }
 
-  prettyPrint(declarations, controlStructures) {
+  // =========================
+  // Pretty Printing Primitives
+  // ==========================
+
+  pushNewlineIfMissing() {
+    if (this.lookAhead() != Lexer.NEWLINE) {
+      this.push(Lexer.NEWLINE);
+    }
+  }
+
+  consumeWhitespacesAndNewlines() {
+    while (this.notEnd() && Lexer.whitespaceOrNewline(this.lookAhead())) {
+      this.advance();
+    }
+  }
+
+  prettyPrint(controlStructures) {
     while (this.notEnd()) {
       this.advance();
       switch (this.current.type) {
+        case Lexer.NEWLINE.type:
         case Lexer.WHITESPACE.type:
           this.pushCurrent();
-          this.consumeWhitespaces();
+          this.consumeWhitespacesAndNewlines();
           break;
         case Lexer.SEMI.type:
-          // add newline after ;
           this.pushCurrent();
-          if (this.lookAhead() != Lexer.NEWLINE) {
-            this.push(Lexer.NEWLINE);
-          }
+          this.pushNewlineIfMissing();
           break;
         case 'IDENTIFIER':
-          if (declarations.indexOf(this.current.value) > -1) {
-            let lastToken = this.resultingTokens[this.resultingTokens.length - 2];
+          if (this.atDeclaration()) {
+            let lastToken = this.last();
             // add newline before new declarations
-            if (lastToken && lastToken.type != Lexer.NEWLINE) {
+            if (lastToken && lastToken != Lexer.NEWLINE) {
               this.push(Lexer.NEWLINE);
             }
             this.pushCurrent();
@@ -261,7 +291,6 @@ class PrettyPrinter {
           this.pushCurrent();
       }
     }
-
     return this.resultingTokens.map((token) => token.value).join('');
   }
 }
@@ -338,7 +367,7 @@ describe("Lexer", () => {
 
 
 function format(code) {
-  return new PrettyPrinter(code).prettyPrint(['function', 'procedure'], ['if', 'repeat', 'while']);
+  return new PrettyPrinter(code, ['function', 'procedure']).prettyPrint(['if', 'repeat', 'while']);
 }
 
 describe("format", () => {
@@ -358,7 +387,14 @@ describe("format", () => {
     it("function foo() {\n}\n\nfunction bar() {\n}\n", () => {
       assert.equal(format("function foo() {\n}\n\nfunction bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
     });
+
     it("function foo(x) {\n}\n", () => { assert.equal(format("function foo(x) {\n}\n"), "function foo(x) {\n}\n") });
+    it(" function foo(x) {\n}\n", () => { assert.equal(format(" function foo(x) {\n}\n"), " \nfunction foo(x) {\n}\n") });
+    it("\n\nfunction foo(x) {\n}\n", () => { assert.equal(format("\n\nfunction foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
+    it("\n\n  function foo(x) {\n}\n", () => { assert.equal(format("\n\n  function foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
+    it("\n \n  function foo(x) {\n}\n", () => { assert.equal(format("\n \n  function foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
+    it(" \n \n  function foo(x) {\n}\n", () => { assert.equal(format(" \n \n  function foo(x) {\n}\n"), "\nfunction foo(x) {\n}\n") });
+
     it("function foo (x) {\n}\n", () => { assert.equal(format("function foo (x) {\n}\n"), "function foo(x) {\n}\n") });
     it("function foo (x, y) {\n}\n", () => { assert.equal(format("function foo (x, y) {\n}\n"), "function foo(x, y) {\n}\n") });
     it("function foo (  x, y ) {\n}\n", () => { assert.equal(format("function foo (  x, y ) {\n}\n"), "function foo(x, y) {\n}\n") });
