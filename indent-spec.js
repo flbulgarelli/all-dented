@@ -220,14 +220,29 @@ class PrettyPrinter {
   // Pretty Printing Primitives
   // ==========================
 
-  pushNewlineIfMissing() {
+  pushNewlineWhenNextIsMissing() {
     if (this.lookAhead() != Lexer.NEWLINE) {
+      this.push(Lexer.NEWLINE);
+    }
+  }
+
+  pushNewlineWhenPreviousIsMissing() {
+    let lastToken = this.last();
+    if (lastToken && lastToken != Lexer.NEWLINE) {
       this.push(Lexer.NEWLINE);
     }
   }
 
   consumeWhitespacesAndNewlines() {
     while (this.notEnd() && Lexer.whitespaceOrNewline(this.lookAhead())) {
+      this.advance();
+    }
+  }
+
+  advanceIgnoringWhitespacesAndNewlines() {
+    this.advance();
+    if (this.atWhitespaceOrNewline()) {
+      this.consumeWhitespacesAndNewlines();
       this.advance();
     }
   }
@@ -243,38 +258,27 @@ class PrettyPrinter {
           break;
         case Lexer.SEMI.type:
           this.pushCurrent();
-          this.pushNewlineIfMissing();
+          this.pushNewlineWhenNextIsMissing();
           break;
         case 'IDENTIFIER':
           if (this.atDeclaration()) {
-            let lastToken = this.last();
-            // add newline before new declarations
-            if (lastToken && lastToken != Lexer.NEWLINE) {
-              this.push(Lexer.NEWLINE);
-            }
+            // keyword
+            this.pushNewlineWhenPreviousIsMissing();
             this.pushCurrent();
-
-            // compact spaces
-            do {
-              this.advance();
-            } while (this.atWhitespaceOrNewline())
+            this.advanceIgnoringWhitespacesAndNewlines();
             this.push(Lexer.WHITESPACE);
 
+            // name
             if (this.current.type == 'IDENTIFIER') {
               this.pushCurrent();
-              // remove odd spaces before paren
-              do {
-                this.advance();
-              } while (this.atWhitespaceOrNewline())
+              this.advanceIgnoringWhitespacesAndNewlines();
             }
-            this.pushCurrent();
 
-            // remove odd spaces after paren
-            do {
-              this.advance();
-            } while (this.atWhitespaceOrNewline())
+            // (
             this.pushCurrent();
+            this.advanceIgnoringWhitespacesAndNewlines();
 
+            this.pushCurrent();
             let balance = 1;
             while (balance > 0 && this.notEnd()) {
               if (this.current == Lexer.OPEN_PAREN) {
@@ -387,6 +391,8 @@ describe("format", () => {
     it("function foo() {\n}\n\nfunction bar() {\n}\n", () => {
       assert.equal(format("function foo() {\n}\n\nfunction bar() {\n}\n"), "function foo() {\n}\n\nfunction bar() {\n}\n")
     });
+
+    it("function(x) {\n}\n", () => { assert.equal(format("function(x) {\n}\n"), "function (x) {\n}\n") });
 
     it("function foo(x) {\n}\n", () => { assert.equal(format("function foo(x) {\n}\n"), "function foo(x) {\n}\n") });
     it(" function foo(x) {\n}\n", () => { assert.equal(format(" function foo(x) {\n}\n"), " \nfunction foo(x) {\n}\n") });
