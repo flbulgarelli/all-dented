@@ -167,7 +167,11 @@ class PrettyPrinter {
     this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {compactWhitespaces: true});
     this.index = 0;
     this.resultingTokens = [];
-    this.declarations = declarations;
+    this.keywords = declarations.map((it) => it.keyword);
+    this.declarations = {};
+    declarations.forEach((declaration) => {
+      this.declarations[declaration.keyword] = declaration;
+    });
   }
 
   // =========
@@ -197,7 +201,7 @@ class PrettyPrinter {
   }
 
   atDeclaration() {
-    return this.declarations.indexOf(this.current.value) > -1;
+    return this.keywords.indexOf(this.current.value) > -1;
   }
 
   // ===============
@@ -239,6 +243,13 @@ class PrettyPrinter {
     let lastToken = this.last();
     if (lastToken && lastToken != Lexer.NEWLINE) {
       this.push(Lexer.NEWLINE);
+    }
+  }
+
+  pushWhitespaceWhenPreviousIsMissing() {
+    let lastToken = this.last();
+    if (lastToken && lastToken != Lexer.WHITESPACE) {
+      this.push(Lexer.WHITESPACE);
     }
   }
 
@@ -306,46 +317,60 @@ class PrettyPrinter {
     }
   }
 
-  handleDeclaration() {
-    this.pushNewlineWhenPreviousIsMissing();
-    this.pushCurrent();
-    this.advanceIgnoringWhitespacesAndNewlines();
-
-    // whitespace
-    this.pushWhitespace();
-
-    // name
-    if (this.current.type == 'IDENTIFIER') {
-      this.pushCurrent();
-      this.advanceIgnoringWhitespacesAndNewlines();
-    }
-
+  handleArgs() {
     // (
     this.pushCurrent();
     this.advanceIgnoringWhitespacesAndNewlines();
 
-    // args
+    // args?
     this.handleBalanced(Lexer.OPEN_PAREN, Lexer.CLOSE_PAREN, () => this.pushCurrent());
 
     // )
     this.pushCurrent();
     this.advanceIgnoringWhitespacesAndNewlines();
-
-    // whitespace
     this.pushWhitespace();
+  }
 
+  handleBody() {
     // {
     this.pushCurrent();
     this.pushNewlineWhenNextIsMissing();
     this.advance();
 
-    // body
+    // body?
     this.handleBalanced(Lexer.OPEN_BRACE, Lexer.CLOSE_BRACE, () => this.handleCurrent());
 
     // }
     this.pushNewlineWhenPreviousIsMissing();
     this.pushCurrent();
     this.pushNewlineWhenNextIsMissing();
+  }
+
+  handleDeclaration() {
+    let currentDeclaration = this.declarations[this.current.value];
+
+    if (currentDeclaration.trailing) {
+      this.popWhitespaceOrNewline();
+      this.pushWhitespaceWhenPreviousIsMissing();
+    } else {
+      this.pushNewlineWhenPreviousIsMissing();
+    }
+    this.pushCurrent();
+    this.advanceIgnoringWhitespacesAndNewlines();
+    this.pushWhitespace();
+
+    if (this.current.type == 'IDENTIFIER') {
+      this.pushCurrent();
+      this.advanceIgnoringWhitespacesAndNewlines();
+    }
+
+    if (this.current == Lexer.OPEN_PAREN) {
+      this.handleArgs();
+    }
+
+    if (this.current == Lexer.OPEN_BRACE) {
+      this.handleBody();
+    }
   }
 
   prettyPrint() {
@@ -429,7 +454,12 @@ describe("Lexer", () => {
 
 
 function format(code) {
-  return new PrettyPrinter(code, ['function', 'procedure', 'if', 'repeat']).prettyPrint();
+  return new PrettyPrinter(code, [
+    {keyword: 'function'},
+    {keyword: 'procedure'},
+    {keyword: 'if'},
+    {keyword: 'else', trailing: true},
+    {keyword: 'repeat'}]).prettyPrint();
 }
 
 describe("format", () => {
@@ -446,14 +476,19 @@ describe("format", () => {
   describe("ifs", () => {
     prints(("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n");
     prints(("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n");
+
+    prints(("if(true){console.log('ups')}else{console.log('ok')}"), "if (true) {\nconsole.log('ups')\n} else {\nconsole.log('ok')\n}\n");
+    //prints(("if(true){console.log('ups')}else if (false) {console.log('ok')}"), "if (true) {\nconsole.log('ups')\n} else if (false) {\nconsole.log('ok')\n}\n");
+    //prints(("x = 4\nif(true){console.log('ups')}else if (false) {console.log('ok')}x = 5\nx = 8"), "if (true) {\nconsole.log('ups')\n}\n");
   });
+
 
   describe("functions", () => {
     prints("function foo(){let x = 1; let y = 2; if(true){console.log(y)}}", "function foo() {\nlet x = 1;\n let y = 2;\n \nif (true) {\nconsole.log(y)\n}\n}\n");
 
     prints("function foo() {\n}\n", "function foo() {\n}\n");
-    prints("function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n");
-    prints("function foo() {\n}function bar() {\n}\n", "function foo() {\n}function bar() {\n}\n", "function foo() {\n}\n\nfunction bar() {\n}\n");
+    prints("function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\nfunction bar() {\n}\n");
+    prints("function foo() {\n}function bar() {\n}\n", "function foo() {\n}\nfunction bar() {\n}\n");
 
     prints("function(x) {\n}\n", "function (x) {\n}\n");
     prints("function(x){return 2;}", "function (x) {\nreturn 2;\n}\n");
