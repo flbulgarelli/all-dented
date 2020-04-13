@@ -1,0 +1,19 @@
+{
+  "name": "all-dented",
+  "version": "0.0.1",
+  "description": "Abstract code indenter and formatter",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha spec/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/flbulgarelli/all-dented.git"
+  },
+  "author": "Franco Leonardo Bulgarelli",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/flbulgarelli/all-dented/issues"
+  },
+  "homepage": "https://github.com/flbulgarelli/all-dented#readme"
+}
