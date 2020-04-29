@@ -34,6 +34,10 @@ class Lexer {
     return this.code.charAt(this.index);
   }
 
+  nextIs(char) {
+    return this.lookAhead() === char;
+  }
+
   consumeString(delimiter) {
     let string = [delimiter];
     while (this.notEnd() && this.advance() != delimiter) {
@@ -62,7 +66,7 @@ class Lexer {
   consumeComment() {
     let comment = [];
     this.advance();
-    while (this.notEnd() && this.lookAhead() != "\n") {
+    while (this.notEnd() && !this.nextIs("\n")) {
       this.advance();
       comment.push(this.current);
     }
@@ -75,12 +79,17 @@ class Lexer {
       switch (this.current) {
         case ' ':
         case '\t':
-          if (this.options.compactWhitespaces) {
+          if (this.options.squeeze) {
             this.consumeWhitespaces();
           }
-          this.push(Lexer.WHITESPACE);
+          if (!this.options.squeeze || !this.nextIs("\n")) {
+            this.push(Lexer.WHITESPACE);
+          }
           break;
         case '\n':
+          if (this.options.trim) {
+            this.consumeWhitespaces();
+          }
           this.push(Lexer.NEWLINE);
           break;
         case '{':
@@ -96,13 +105,13 @@ class Lexer {
           this.push(Lexer.CLOSE_PAREN);
           break;
         case '/':
-          if (this.lookAhead() == '/') {
+          if (this.nextIs('/')) {
             this.push(Lexer.comment(this.consumeComment()));
             break;
-          } else if (this.lookAhead() == '*')  {
+          } else if (this.nextIs('*'))  {
             let comment = [];
             this.advance();
-            while (this.notEnd() && this.advance() != "*" && this.lookAhead() != "/") {
+            while (this.notEnd() && this.advance() != "*" && !this.nextIs("/")) {
               comment.push(this.current);
             }
             this.push({type: 'COMMENT', value: comment});
@@ -164,7 +173,7 @@ function printCode(code) {
 class PrettyPrinter {
   constructor(code, declarations) {
     this.code = code;
-    this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {compactWhitespaces: true});
+    this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {squeeze: true});
     this.index = 0;
     this.resultingTokens = [];
     this.keywords = declarations.map((it) => it.keyword);
@@ -385,7 +394,7 @@ class PrettyPrinter {
 
 describe("Lexer", () => {
   function lexes(code, tokens) {
-    it(code, () => { assert.deepEqual(lex(code), tokens) });
+    it(code, () => { assert.deepEqual(lex(code, { squeeze: true, trim: true }), tokens) });
   }
 
   lexes("", []);
@@ -397,8 +406,11 @@ describe("Lexer", () => {
   lexes('"foo";"bar"', [Lexer.string('"foo"'), Lexer.SEMI, Lexer.string('"bar"')]);
   lexes('foo', [Lexer.identifier("foo")]);
   lexes('foo bar baz', [Lexer.identifier("foo"), Lexer.WHITESPACE, Lexer.identifier("bar"), Lexer.WHITESPACE, Lexer.identifier("baz")]);
-  lexes('foo  bar', [Lexer.identifier("foo"), Lexer.WHITESPACE, Lexer.WHITESPACE, Lexer.identifier("bar")]);
+  lexes('foo  bar', [Lexer.identifier("foo"), Lexer.WHITESPACE, Lexer.identifier("bar")]);
   lexes('foo\nbar\nbaz', [Lexer.identifier("foo"), Lexer.NEWLINE, Lexer.identifier("bar"), Lexer.NEWLINE, Lexer.identifier("baz")]);
+  lexes('foo\n bar\n baz', [Lexer.identifier("foo"), Lexer.NEWLINE, Lexer.identifier("bar"), Lexer.NEWLINE, Lexer.identifier("baz")]);
+  lexes('foo\n  bar\n  baz', [Lexer.identifier("foo"), Lexer.NEWLINE, Lexer.identifier("bar"), Lexer.NEWLINE, Lexer.identifier("baz")]);
+  lexes('foo  \n  bar  \n  baz', [Lexer.identifier("foo"), Lexer.NEWLINE, Lexer.identifier("bar"), Lexer.NEWLINE, Lexer.identifier("baz")]);
   lexes('// foo', [Lexer.comment(" foo")]);
   lexes('// foo\n', [Lexer.comment(" foo"), Lexer.NEWLINE]);
   lexes('// foo\n// bar\n', [Lexer.comment(" foo"), Lexer.NEWLINE, Lexer.comment(" bar"), Lexer.NEWLINE]);
