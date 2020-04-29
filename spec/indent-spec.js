@@ -173,7 +173,7 @@ function printCode(code) {
 class PrettyPrinter {
   constructor(code, declarations) {
     this.code = code;
-    this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {squeeze: true});
+    this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {squeeze: true, trim: true});
     this.index = 0;
     this.resultingTokens = [];
     this.keywords = declarations.map((it) => it.keyword);
