@@ -40,7 +40,7 @@ class Lexer {
 
   consumeString(delimiter) {
     let string = [delimiter];
-    while (this.notEnd() && this.advance() != delimiter) {
+    while (this.notEnd() && this.advance() !== delimiter) {
       string.push(this.current);
     }
     string.push(delimiter);
@@ -111,7 +111,7 @@ class Lexer {
           } else if (this.nextIs('*'))  {
             let comment = [];
             this.advance();
-            while (this.notEnd() && this.advance() != "*" && !this.nextIs("/")) {
+            while (this.notEnd() && this.advance() !== "*" && !this.nextIs("/")) {
               comment.push(this.current);
             }
             this.push({type: 'COMMENT', value: comment});
@@ -202,6 +202,10 @@ class PrettyPrinter {
     return this.tokens[this.index];
   }
 
+  nextIs(token) {
+    return this.lookAhead() === token;
+  }
+
   // ==============
   // Input checking
   // ==============
@@ -223,8 +227,9 @@ class PrettyPrinter {
   }
 
   pushCurrent() {
-    this.updateCurrentIndentationLevel();
+    this.updateIndentationLevel();
     this.push(this.current);
+    this.indent();
   }
 
   pushWhitespace() {
@@ -239,10 +244,18 @@ class PrettyPrinter {
     this.resultingTokens.pop();
   }
 
-  updateCurrentIndentationLevel() {
-    if (this.current == Lexer.OPEN_BRACE) {
+  indent() {
+    if (this.current === Lexer.NEWLINE && !this.nextIs(Lexer.NEWLINE) && !this.nextIs(Lexer.CLOSE_BRACE)) {
+      for (let i = 0; i < (this.indentationLevel * 2); i++) {
+        this.push(Lexer.WHITESPACE);
+      }
+    }
+  }
+
+  updateIndentationLevel() {
+    if (this.current === Lexer.OPEN_BRACE) {
       this.indentationLevel++;
-    } else if (this.current == Lexer.CLOSE_BRACE) {
+    } else if (this.current === Lexer.CLOSE_BRACE) {
       this.indentationLevel--;
     }
   }
@@ -252,21 +265,21 @@ class PrettyPrinter {
   // ==========================
 
   pushNewlineWhenNextIsMissing() {
-    if (this.lookAhead() != Lexer.NEWLINE) {
+    if (!this.nextIs(Lexer.NEWLINE)) {
       this.push(Lexer.NEWLINE);
     }
   }
 
   pushNewlineWhenPreviousIsMissing() {
     let lastToken = this.last();
-    if (lastToken && lastToken != Lexer.NEWLINE) {
+    if (lastToken && lastToken !== Lexer.NEWLINE) {
       this.push(Lexer.NEWLINE);
     }
   }
 
   pushWhitespaceWhenPreviousIsMissing() {
     let lastToken = this.last();
-    if (lastToken && lastToken != Lexer.WHITESPACE) {
+    if (lastToken && lastToken !== Lexer.WHITESPACE) {
       this.push(Lexer.WHITESPACE);
     }
   }
@@ -495,12 +508,12 @@ describe("format", () => {
   prints(("x\n"), "x\n");
 
   describe("ifs", () => {
-    prints(("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n");
-    prints(("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\nconsole.log('ups')\n}\n");
+    prints(("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\n  console.log('ups')\n}\n");
+    prints(("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\n  console.log('ups')\n}\n");
 
     prints(("if(true){console.log('ups')}else{console.log('ok')}"), "if (true) {\nconsole.log('ups')\n} else {\nconsole.log('ok')\n}\n");
-    //prints(("if(true){console.log('ups')}else if (false) {console.log('ok')}"), "if (true) {\nconsole.log('ups')\n} else if (false) {\nconsole.log('ok')\n}\n");
-    //prints(("x = 4\nif(true){console.log('ups')}else if (false) {console.log('ok')}x = 5\nx = 8"), "if (true) {\nconsole.log('ups')\n}\n");
+    prints(("if(true){console.log('ups')}else if (false) {console.log('ok')}"), "if (true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\n");
+    prints(("x = 4\nif(true){console.log('ups')}else if (false) {console.log('ok')}x = 5\nx = 8"), "x = 4\nif(true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\nx = 5\nx = 8");
   });
 
 
