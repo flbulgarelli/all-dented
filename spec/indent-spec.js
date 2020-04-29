@@ -181,6 +181,7 @@ class PrettyPrinter {
     declarations.forEach((declaration) => {
       this.declarations[declaration.keyword] = declaration;
     });
+    this.indentationLevel = 0;
   }
 
   // =========
@@ -222,6 +223,7 @@ class PrettyPrinter {
   }
 
   pushCurrent() {
+    this.updateCurrentIndentationLevel();
     this.push(this.current);
   }
 
@@ -237,6 +239,13 @@ class PrettyPrinter {
     this.resultingTokens.pop();
   }
 
+  updateCurrentIndentationLevel() {
+    if (this.current == Lexer.OPEN_BRACE) {
+      this.indentationLevel++;
+    } else if (this.current == Lexer.CLOSE_BRACE) {
+      this.indentationLevel--;
+    }
+  }
 
   // =========================
   // Pretty Printing Primitives
