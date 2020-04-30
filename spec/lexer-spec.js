@@ -1,7 +1,7 @@
 const {lex, Lexer, PrettyPrinter} = require('../src/index');
 const assert = require('assert');
 
-function prettyPrint(code) {
+function roundTrip(code) {
   let result = lex(code).map((token) => token.value);
   return result.join('');
 }
@@ -73,87 +73,7 @@ describe("Lexer", () => {
  "program{\r\n  Poner(Azul)\r\n  Mover(Este)\r\n  Poner(Azul)\r\n  Mover(Este)\r\n  Poner(Azul)\r\n  Mover(Este)\r\n  Poner(Azul)\r\n  Mover(Este)\r\n  Poner(Azul)\r\n  Mover(Norte)\r\n  Mover(Norte)\r\n  Poner(Azul)\r\n  Mover(Oeste)\r\n  Poner(Azul)\r\n  Mover(Oeste)\r\n  Poner(Azul)\r\n  Mover(Oeste)\r\n  Poner(Azul)\r\n  Mover(Oeste)\r\n  Poner(Azul)\r\n  Mover(Sur)\r\n  Mover(Este)\r\n  Mover(Este)\r\n  Poner(Rojo)\r\n  Mover(Sur)\r\n  Mover(Oeste)\r\n  Mover(Oeste)\r\n}",
  "procedure DibujarLinea3(color){\r\n  repeat(2){\r\n    Poner(color)\r\n    Mover(Este)\r\n  }\r\n  Poner(color)\r\n  VolverAtras()\r\n}"].forEach((code) => {
    it(code, () => {
-    assert.equal(code, prettyPrint(code));
+    assert.equal(code, roundTrip(code));
    })
  })
 })
-
-
-function format(code) {
-  return new PrettyPrinter(code,
-    [
-      {keyword: 'function'},
-      {keyword: 'procedure'},
-      {keyword: 'if'},
-      {keyword: 'else', trailing: true},
-      {keyword: 'repeat'}
-    ],
-    [Lexer.OPEN_BRACE],
-    [Lexer.CLOSE_BRACE]
-  ).prettyPrint();
-}
-
-describe("format", () => {
-  function prints(code, pretty) {
-    it(code, () => { assert.deepEqual(format(code), pretty) });
-  }
-
-
-  prints(("foo();bar();baz()"), "foo();\nbar();\nbaz()");
-  prints((""), "");
-  prints(("let x = 1;\n"), "let x = 1;\n");
-  prints(("x\n"), "x\n");
-
-  describe("ifs", () => {
-    prints(("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\n  console.log('ups')\n}\n");
-    prints(("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\n  console.log('ups')\n}\n");
-
-    prints(("if(true){console.log('ups')}else{console.log('ok')}"), "if (true) {\nconsole.log('ups')\n} else {\nconsole.log('ok')\n}\n");
-    prints(("if(true){console.log('ups')}else if (false) {console.log('ok')}"), "if (true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\n");
-    prints(("x = 4\nif(true){console.log('ups')}else if (false) {console.log('ok')}x = 5\nx = 8"), "x = 4\nif(true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\nx = 5\nx = 8");
-  });
-
-
-  describe("functions", () => {
-    prints("function foo(){let x = 1; let y = 2; if(true){console.log(y)}}", "function foo() {\nlet x = 1;\n let y = 2;\n \nif (true) {\nconsole.log(y)\n}\n}\n");
-
-    prints("function foo() {\n}\n", "function foo() {\n}\n");
-    prints("function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\nfunction bar() {\n}\n");
-    prints("function foo() {\n}function bar() {\n}\n", "function foo() {\n}\nfunction bar() {\n}\n");
-
-    prints("function(x) {\n}\n", "function (x) {\n}\n");
-    prints("function(x){return 2;}", "function (x) {\nreturn 2;\n}\n");
-    prints("function(x){return 2}", "function (x) {\nreturn 2\n}\n");
-
-    prints("function foo(x) {\n}\n", "function foo(x) {\n}\n");
-    prints(" function foo(x) {\n}\n", " \nfunction foo(x) {\n}\n");
-    prints("\n\nfunction foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
-    prints("\n\n  function foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
-    prints("\n \n  function foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
-    prints(" \n \n  function foo(x) {\n}\n", "\nfunction foo(x) {\n}\n");
-
-    prints("function foo (x) {\n}\n", "function foo(x) {\n}\n");
-    prints("function foo (x, y) {\n}\n", "function foo(x, y) {\n}\n");
-    prints("function foo (  x, y ) {\n}\n", "function foo(x, y) {\n}\n");
-    prints("function foo (x, y) {}\n", "function foo(x, y) {\n}\n");
-    prints("function (x, y) {}\n", "function (x, y) {\n}\n");
-  });
-
-  describe("procedures", () => {
-    prints("procedure Foo(x) {\n}\n", "procedure Foo(x) {\n}\n");
-    prints("procedure Foo (x) {\n}\n", "procedure Foo(x) {\n}\n");
-    prints("procedure Foo (x, y) {\n}\n", "procedure Foo(x, y) {\n}\n");
-    prints("procedure Foo (  x, y ) {\n}\n", "procedure Foo(x, y) {\n}\n");
-    prints("procedure Foo (x, y) {}\n", "procedure Foo(x, y) {\n}\n");
-  });
-
-  xdescribe("defs", () => {
-    prints("def foo(x)\nend", "def foo(x)\nend");
-    prints("def foo (x)\nend", "def foo(x)\nend");
-    prints("def foo (x, y)\nend", "def foo(x, y)\nend");
-    prints("def foo (  x, y )\nend", "def foo(x, y)\nend");
-    prints("def foo (  x, y )end", "def foo(x, y)\nend");
-    prints("def foo! (  x, y )end", "def foo!(x, y)\nend");
-    prints("def foo? (  x, y )end", "def foo?(x, y)\nend");
-  });
-});
