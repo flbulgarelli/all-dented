@@ -1,17 +1,22 @@
 const {Lexer, lex} = require('./lexer');
 
 class PrettyPrinter {
-  constructor(code, declarations) {
+  constructor(code, declarations, indentStartTokens, indentEndTokens) {
     this.code = code;
     this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {squeeze: true, trim: true});
     this.index = 0;
     this.resultingTokens = [];
+    this.indentationLevel = 0;
+
+
     this.keywords = declarations.map((it) => it.keyword);
     this.declarations = {};
     declarations.forEach((declaration) => {
       this.declarations[declaration.keyword] = declaration;
     });
-    this.indentationLevel = 0;
+
+    this.indentStartTokens = indentStartTokens;
+    this.indentEndTokens = indentEndTokens;
   }
 
   // =========
@@ -46,6 +51,14 @@ class PrettyPrinter {
 
   atDeclaration() {
     return this.keywords.indexOf(this.current.value) > -1;
+  }
+
+  atIndentStart() {
+    return this.indentStartTokens.indexOf(this.current) > -1;
+  }
+
+  atIndentEnd() {
+    return this.indentEndTokens.indexOf(this.current) > -1;
   }
 
   // ===============
@@ -83,9 +96,9 @@ class PrettyPrinter {
   }
 
   updateIndentationLevel() {
-    if (this.current === Lexer.OPEN_BRACE) {
+    if (this.atIndentStart()) {
       this.indentationLevel++;
-    } else if (this.current === Lexer.CLOSE_BRACE) {
+    } else if (this.atIndentEnd()) {
       this.indentationLevel--;
     }
   }

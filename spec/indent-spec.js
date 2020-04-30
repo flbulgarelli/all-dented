@@ -80,12 +80,17 @@ describe("Lexer", () => {
 
 
 function format(code) {
-  return new PrettyPrinter(code, [
-    {keyword: 'function'},
-    {keyword: 'procedure'},
-    {keyword: 'if'},
-    {keyword: 'else', trailing: true},
-    {keyword: 'repeat'}]).prettyPrint();
+  return new PrettyPrinter(code,
+    [
+      {keyword: 'function'},
+      {keyword: 'procedure'},
+      {keyword: 'if'},
+      {keyword: 'else', trailing: true},
+      {keyword: 'repeat'}
+    ],
+    [Lexer.OPEN_BRACE],
+    [Lexer.CLOSE_BRACE]
+  ).prettyPrint();
 }
 
 describe("format", () => {
