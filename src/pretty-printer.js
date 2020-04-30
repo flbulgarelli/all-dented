@@ -1,7 +1,7 @@
 const {Lexer, lex} = require('./lexer');
 
 class PrettyPrinter {
-  constructor(code, declarations, indentStartTokens, indentEndTokens) {
+  constructor(code, declarations, indentStartTokens, indentEndTokens, bodyStartToken, bodyEndToken) {
     this.code = code;
     this.tokens = lex(code.split("\n").map((it)=> it.trimRight()).join("\n"), {squeeze: true, trim: true});
     this.index = 0;
@@ -17,6 +17,8 @@ class PrettyPrinter {
 
     this.indentStartTokens = indentStartTokens;
     this.indentEndTokens = indentEndTokens;
+    this.bodyStartToken = bodyStartToken;
+    this.bodyEndToken = bodyEndToken;
   }
 
   // =========
@@ -53,14 +55,6 @@ class PrettyPrinter {
     return this.keywords.indexOf(this.current.value) > -1;
   }
 
-  atIndentStart() {
-    return this.indentStartTokens.indexOf(this.current) > -1;
-  }
-
-  atIndentEnd() {
-    return this.indentEndTokens.indexOf(this.current) > -1;
-  }
-
   // ===============
   // Output handling
   // ===============
@@ -70,9 +64,7 @@ class PrettyPrinter {
   }
 
   pushCurrent() {
-    this.updateIndentationLevel();
     this.push(this.current);
-    this.indent();
   }
 
   pushWhitespace() {
@@ -87,20 +79,51 @@ class PrettyPrinter {
     this.resultingTokens.pop();
   }
 
-  indent() {
-    if (this.current === Lexer.NEWLINE && !this.nextIs(Lexer.NEWLINE) && !this.nextIs(Lexer.CLOSE_BRACE)) {
-      for (let i = 0; i < (this.indentationLevel * 2); i++) {
-        this.push(Lexer.WHITESPACE);
-      }
+  // ===========
+  // Indentation
+  // ===========
+
+  indentedPushCurrent() {
+    this.indentedPush(this.current);
+  }
+
+  // like push, but makes a special treatment
+  // for the following tokens:
+  //
+  //   * indentStartTokens and indentEndTokens: update indentation levels before push
+  //   * NEWLINE: add whitespaces when they won't produce and empty line
+  indentedPush(token) {
+    this.updateIndentationLevel(token);
+    this.push(token);
+    if (this.isIndentable(token)) {
+      this.indent();
     }
   }
 
-  updateIndentationLevel() {
-    if (this.atIndentStart()) {
+  isIndentable(token) {
+    return token === Lexer.NEWLINE && !this.nextIs(Lexer.NEWLINE) && !this.nextIs(this.bodyEndToken)
+  }
+
+  indent() {
+    for (let i = 0; i < (this.indentationLevel * 2); i++) {
+      this.push(Lexer.WHITESPACE);
+    }
+  }
+
+  updateIndentationLevel(token) {
+    if (this.isIndentStart(token)) {
       this.indentationLevel++;
-    } else if (this.atIndentEnd()) {
+    } else if (this.isIndentEnd(token)) {
       this.indentationLevel--;
     }
+  }
+
+  isIndentStart(token) {
+    return this.indentStartTokens.indexOf(token) > -1;
+  }
+
+  isIndentEnd(token) {
+    return this.indentEndTokens.indexOf(token) > -1;
   }
 
   // =========================
@@ -212,7 +235,7 @@ class PrettyPrinter {
     this.advance();
 
     // body?
-    this.handleBalanced(Lexer.OPEN_BRACE, Lexer.CLOSE_BRACE, () => this.handleCurrent());
+    this.handleBalanced(this.bodyStartToken, this.bodyEndToken, () => this.handleCurrent());
 
     // }
     this.pushNewlineWhenPreviousIsMissing();
