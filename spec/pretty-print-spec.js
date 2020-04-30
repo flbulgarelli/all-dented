@@ -46,22 +46,24 @@ describe("prettyPrint", () => {
 // { type: 'CLOSE_PAREN', value: ')' }
 // { type: 'CLOSE_BRACE', value: '}' }
 
-    prints(("if(true){console.log('ups')}else{console.log('ok')}"), "if (true) {\nconsole.log('ups')\n} else {\nconsole.log('ok')\n}\n");
+    prints(("if(true){console.log('ups')}else{console.log('ok')}"), "if (true) {\n  console.log('ups')\n} else {\n  console.log('ok')\n}\n");
     prints(("if(true){console.log('ups')}else if (false) {console.log('ok')}"), "if (true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\n");
     prints(("x = 4\nif(true){console.log('ups')}else if (false) {console.log('ok')}x = 5\nx = 8"), "x = 4\nif (true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\nx = 5\nx = 8");
   });
 
 
   describe("functions", () => {
-    prints("function foo(){let x = 1; let y = 2; if(true){console.log(y)}}", "function foo() {\nlet x = 1;\n let y = 2;\n \nif (true) {\nconsole.log(y)\n}\n}\n");
+    prints("function foo(){let x = 1;let y = 2;if(true){console.log(y)}}", "function foo() {\n  let x = 1;\n  let y = 2;\n  \n  if (true) {\n    console.log(y)\n  }\n}\n");
+    prints("function foo(){let x = 1; let y = 2; if(true){console.log(y)}}", "function foo() {\n  let x = 1;\n  let y = 2;\n  \n  if (true) {\n    console.log(y)\n  }\n}\n");
+    prints("function foo(){let x = 1;if(true){console.log(y)}if(false){console.log(z)}}", "function foo() {\n  let x = 1;\n  \n  if (true) {\n    console.log(y)\n  }\n  \n  if (false) {\n    console.log(z)\n  }\n}\n");
 
     prints("function foo() {\n}\n", "function foo() {\n}\n");
     prints("function foo() {\n}\n\nfunction bar() {\n}\n", "function foo() {\n}\nfunction bar() {\n}\n");
     prints("function foo() {\n}function bar() {\n}\n", "function foo() {\n}\nfunction bar() {\n}\n");
 
     prints("function(x) {\n}\n", "function (x) {\n}\n");
-    prints("function(x){return 2;}", "function (x) {\nreturn 2;\n}\n");
-    prints("function(x){return 2}", "function (x) {\nreturn 2\n}\n");
+    prints("function(x){return 2;}", "function (x) {\n  return 2;\n}\n");
+    prints("function(x){return 2}", "function (x) {\n  return 2\n}\n");
 
     prints("function foo(x) {\n}\n", "function foo(x) {\n}\n");
     prints(" function foo(x) {\n}\n", " \nfunction foo(x) {\n}\n");

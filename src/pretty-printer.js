@@ -64,7 +64,8 @@ class PrettyPrinter {
   }
 
   pushCurrent() {
-    this.push(this.current);
+    // push current is indented by default
+    this.indentedPush(this.current);
   }
 
   pushWhitespace() {
@@ -83,29 +84,28 @@ class PrettyPrinter {
   // Indentation
   // ===========
 
-  indentedPushCurrent() {
-    this.indentedPush(this.current);
-  }
-
   // like push, but makes a special treatment
   // for the following tokens:
   //
   //   * indentStartTokens and indentEndTokens: update indentation levels before push
   //   * NEWLINE: add whitespaces when they won't produce and empty line
-  indentedPush(token) {
+  indentedPush(token, next) {
+    next = next || this.lookAhead();
     this.updateIndentationLevel(token);
     this.push(token);
-    if (this.isIndentable(token)) {
-      this.indent();
+    if (this.isIndentable(token, next)) {
+      this.indent(next);
     }
   }
 
-  isIndentable(token) {
-    return token === Lexer.NEWLINE && !this.nextIs(Lexer.NEWLINE) && !this.nextIs(this.bodyEndToken)
+  isIndentable(token, next) {
+    return token === Lexer.NEWLINE && next !== Lexer.NEWLINE;
   }
 
-  indent() {
-    for (let i = 0; i < (this.indentationLevel * 2); i++) {
+  indent(next) {
+    let indentationLevel = next === this.bodyEndToken ? this.indentationLevel - 1 : this.indentationLevel;
+
+    for (let i = 0; i < indentationLevel * 2; i++) {
       this.push(Lexer.WHITESPACE);
     }
   }
@@ -132,14 +132,14 @@ class PrettyPrinter {
 
   pushNewlineWhenNextIsMissing() {
     if (!this.nextIs(Lexer.NEWLINE)) {
-      this.push(Lexer.NEWLINE);
+      this.indentedPush(Lexer.NEWLINE);
     }
   }
 
   pushNewlineWhenPreviousIsMissing() {
     let lastToken = this.last();
     if (lastToken && lastToken !== Lexer.NEWLINE) {
-      this.push(Lexer.NEWLINE);
+      this.indentedPush(Lexer.NEWLINE, this.current);
     }
   }
 
