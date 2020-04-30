@@ -243,13 +243,6 @@ class PrettyPrinter {
   }
 }
 
-function prettyPrint(code) {
-  let result = lex(code).map((token) => token.value);
-  return result.join('');
-}
-
-
 module.exports = {
-  PrettyPrinter: PrettyPrinter,
-  prettyPrint: prettyPrint
+  PrettyPrinter: PrettyPrinter
 }

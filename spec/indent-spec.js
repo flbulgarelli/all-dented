@@ -1,5 +1,10 @@
-const {lex, Lexer, prettyPrint, PrettyPrinter} = require('../src/index');
+const {lex, Lexer, PrettyPrinter} = require('../src/index');
 const assert = require('assert');
+
+function prettyPrint(code) {
+  let result = lex(code).map((token) => token.value);
+  return result.join('');
+}
 
 describe("Lexer", () => {
   function lexes(code, tokens) {
