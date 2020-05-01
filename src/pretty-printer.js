@@ -43,6 +43,12 @@ class PrettyPrinter {
     return this.lookAhead() === token;
   }
 
+  retract() {
+    this.index--;
+    this.current = this.tokens[this.index];
+    return this.current;
+  }
+
   // ==============
   // Input checking
   // ==============
@@ -52,7 +58,11 @@ class PrettyPrinter {
   }
 
   atDeclaration() {
-    return this.keywords.indexOf(this.current.value) > -1;
+    return this.atDeclarationOf(this.keywords);
+  }
+
+  atDeclarationOf(keywords) {
+    return (keywords || []).indexOf(this.current.value) > -1;
   }
 
   // ===============
@@ -104,8 +114,8 @@ class PrettyPrinter {
 
   indent(next) {
     let indentationLevel = next === this.bodyEndToken ? this.indentationLevel - 1 : this.indentationLevel;
-
-    for (let i = 0; i < indentationLevel * 2; i++) {
+    let whitespacesCount = next === Lexer.WHITESPACE ? indentationLevel * 2 - 1 : indentationLevel * 2;
+    for (let i = 0; i < whitespacesCount; i++) {
       this.push(Lexer.WHITESPACE);
     }
   }
@@ -126,7 +136,15 @@ class PrettyPrinter {
     return this.indentEndTokens.indexOf(token) > -1;
   }
 
-  // =========================
+  // ============
+  // Declarations
+  // ============
+
+  currentDeclaration() {
+    return this.declarations[this.current.value];
+  }
+
+  // ==========================
   // Pretty Printing Primitives
   // ==========================
 
@@ -188,7 +206,7 @@ class PrettyPrinter {
         break;
       case 'IDENTIFIER':
         if (this.atDeclaration()) {
-          this.handleDeclaration();
+          this.handleStandaloneDeclaration();
           break;
         }
       default:
@@ -214,7 +232,7 @@ class PrettyPrinter {
     }
   }
 
-  handleArgs() {
+  handleDeclarationArgs() {
     // (
     this.pushCurrent();
     this.advanceIgnoringWhitespacesAndNewlines();
@@ -228,7 +246,7 @@ class PrettyPrinter {
     this.pushWhitespace();
   }
 
-  handleBody() {
+  handleDeclarationBody() {
     // {
     this.pushCurrent();
     this.pushNewlineWhenNextIsMissing();
@@ -243,8 +261,18 @@ class PrettyPrinter {
     this.pushNewlineWhenNextIsMissing();
   }
 
-  handleDeclaration() {
-    let currentDeclaration = this.declarations[this.current.value];
+  handleDeclarationHeader() {
+    if (this.current.type == 'IDENTIFIER') {
+      this.pushCurrent();
+      this.advanceIgnoringWhitespacesAndNewlines();
+    }
+    if (this.current == Lexer.OPEN_PAREN) {
+      this.handleDeclarationArgs();
+    }
+  }
+
+  handleStandaloneDeclaration() {
+    let currentDeclaration = this.currentDeclaration();
 
     if (currentDeclaration.trailing) {
       this.popWhitespaceOrNewline();
@@ -252,21 +280,25 @@ class PrettyPrinter {
     } else {
       this.pushNewlineWhenPreviousIsMissing();
     }
+
+    this.handleDeclaration(currentDeclaration);
+  }
+
+  handleDeclaration(currentDeclaration) {
     this.pushCurrent();
     this.advanceIgnoringWhitespacesAndNewlines();
     this.pushWhitespace();
 
-    if (this.current.type == 'IDENTIFIER') {
-      this.pushCurrent();
-      this.advanceIgnoringWhitespacesAndNewlines();
-    }
-
-    if (this.current == Lexer.OPEN_PAREN) {
-      this.handleArgs();
+    if (!currentDeclaration.headless) {
+      this.handleDeclarationHeader();
     }
 
     if (this.current == Lexer.OPEN_BRACE) {
-      this.handleBody();
+      this.handleDeclarationBody();
+    } else if (this.atDeclarationOf(currentDeclaration.continuators)) {
+      this.handleDeclaration(this.currentDeclaration());
+    } else {
+      this.retract();
     }
   }
 

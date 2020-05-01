@@ -7,7 +7,7 @@ function prettyPrint(code) {
       {keyword: 'function'},
       {keyword: 'procedure'},
       {keyword: 'if'},
-      {keyword: 'else', trailing: true},
+      {keyword: 'else', trailing: true, headless: true, continuators: ['if']},
       {keyword: 'repeat'}
     ],
     [Lexer.OPEN_BRACE],
@@ -32,20 +32,6 @@ describe("prettyPrint", () => {
     prints(("if (true) {\nconsole.log('ups')\n}\n"), "if (true) {\n  console.log('ups')\n}\n");
     prints(("if(true){\nconsole.log('ups')\n}\n"), "if (true) {\n  console.log('ups')\n}\n");
     prints(("if(true){console.log('ups')}"), "if (true) {\n  console.log('ups')\n}\n");
-
-//     { type: 'IDENTIFIER', value: 'if' }
-// { type: 'OPEN_PAREN', value: '(' }
-// { type: 'IDENTIFIER', value: 'true' }
-// { type: 'CLOSE_PAREN', value: ')' }
-// { type: 'OPEN_BRACE', value: '{' }
-// { type: 'IDENTIFIER', value: 'console' }
-// { type: 'OTHER', value: '.' }
-// { type: 'IDENTIFIER', value: 'log' }
-// { type: 'OPEN_PAREN', value: '(' }
-// { type: 'STRING', value: '\'ups\'' }
-// { type: 'CLOSE_PAREN', value: ')' }
-// { type: 'CLOSE_BRACE', value: '}' }
-
     prints(("if(true){console.log('ups')}else{console.log('ok')}"), "if (true) {\n  console.log('ups')\n} else {\n  console.log('ok')\n}\n");
     prints(("if(true){console.log('ups')}else if (false) {console.log('ok')}"), "if (true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\n");
     prints(("x = 4\nif(true){console.log('ups')}else if (false) {console.log('ok')}x = 5\nx = 8"), "x = 4\nif (true) {\n  console.log('ups')\n} else if (false) {\n  console.log('ok')\n}\nx = 5\nx = 8");
